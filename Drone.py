@@ -91,18 +91,18 @@ class photo:
                 WHITE_MIN = np.array([220, 220, 220],np.uint8)
                 WHITE_MAX = np.array([255, 255, 255],np.uint8)
                 
-                frame_threshed = cv2.inRange(src=img_crop, lowerb=WHITE_MIN, upperb=WHITE_MAX)
+                frame_threshed = cv2.inRange(src=self.img_crop, lowerb=WHITE_MIN, upperb=WHITE_MAX)
                 sfunc.cView(frame_threshed)
                 
                 #view segmented imaged
-                cropthresh=cv2.bitwise_and(img_crop,img_crop,mask=frame_threshed)
+                cropthresh=cv2.bitwise_and(self.img_crop,self.img_crop,mask=frame_threshed)
                 sfunc.cView(cropthresh)
                 
                 # count number of clusters
                 image, contours, hierarchy = cv2.findContours(frame_threshed,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
                 
                 #draw clusters on a copy of the original image 
-                cropcopy=img_crop.copy()
+                cropcopy=self.img_crop.copy()
                 
                 for cnt in contours:
                     cv2.drawContours(cropcopy, contours, -1, (0,0,255),5)

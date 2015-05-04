@@ -7,15 +7,14 @@ import numpy as np
 #==================
 
 if __name__ == "__main__":
-        while True:
-                try:
-                        p=Drone.photo("C:/Users/Ben/Desktop/4.tif")
-                        img=Drone.photo.quadrat(p)
-                        count=Drone.photo.count(img)
-                        print("count is : %d" %count)
-                except ValueError, e:
-                        if e.message!= 'Failed to load OpenCL runtime':
-                                raise ValueError, e
+        try:
+                p=Drone.photo("C:/Users/Ben/Desktop/4.tif")
+                p.quadrat()
+                count=p.count()
+                print("count is : %d" %count)
+        except ValueError, e:
+                if e.message!= 'Failed to load OpenCL runtime':
+                        raise ValueError, e
 
 
 
