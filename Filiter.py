@@ -10,7 +10,7 @@ import numpy as np
 import sfunc
 
 #Read in file
-file="C:/Users/Ben/Desktop/DJI01343.tif"
+file="C:/Users/Ben/Desktop/4.tif"
 img=cv2.imread(file)
 
 #view 
@@ -33,8 +33,8 @@ frame_threshed = cv2.inRange(src=img_hsv, lowerb=RED_MIN, upperb=RED_MAX)
 sfunc.cView(frame_threshed)
 
 #inflate sections to remove any small blips
-kernel = np.ones((40,40),np.uint8)
-closing = cv2.dilate(frame_threshed, kernel,3)
+kernel = np.ones((100,100),np.uint8)
+closing = cv2.dilate(frame_threshed, kernel,2)
 sfunc.cView(closing)
 
 #draw contours 
@@ -86,37 +86,37 @@ sfunc.cView(img_crop)
 
 ###get histogram of hsv 
 
-#Turn to HSV color space
-imgc_hsv=cv2.cvtColor(img_crop,cv2.COLOR_BGR2HSV)
-sfunc.cView(imgc_hsv)
+#Turn to HSL color space - easiest to track white.
+#imgc_hsv=cv2.cvtColor(img_crop,cv2.COLOR_BGR2HLS)
+#sfunc.cView(imgc_hsv)
 
 #threshold colors
 
 ##what is a flower color? Its somewhere between white and red
 ## i googled these colors
-WHITE_MIN = np.array([0, 0, 220],np.uint8)
-WHITE_MAX = np.array([180, 50, 255],np.uint8)
+WHITE_MIN = np.array([220, 220, 220],np.uint8)
+WHITE_MAX = np.array([255, 255, 255],np.uint8)
 
-frame_threshed = cv2.inRange(src=imgc_hsv, lowerb=WHITE_MIN, upperb=WHITE_MAX)
-cv2.namedWindow("threshold",cv2.WINDOW_NORMAL)
-cv2.imshow("threshold",frame_threshed)
-cv2.waitKey(0)
-cv2.destroyAllWindows()
+frame_threshed = cv2.inRange(src=img_crop, lowerb=WHITE_MIN, upperb=WHITE_MAX)
+sfunc.cView(frame_threshed)
 
 #view segmented imaged
 cropthresh=cv2.bitwise_and(img_crop,img_crop,mask=frame_threshed)
-cv2.namedWindow("threshold",cv2.WINDOW_NORMAL)
-cv2.imshow("threshold",cropthresh)
-cv2.waitKey(0)
-cv2.destroyAllWindows()
+sfunc.cView(cropthresh)
 
-##inflate sections to remove any small blips
-#kernel = np.ones((40,40),np.uint8)
-#closing = cv2.dilate(frame_threshed, kernel,3)
-#cv2.namedWindow("threshold",cv2.WINDOW_NORMAL)
-#cv2.imshow("threshold",closing)
-#cv2.waitKey(0)
-#cv2.destroyAllWindows()
+##deflate then the mask and inflate sections to remove any small blips
+#kernel = np.ones((2,2),np.uint8)
+#opening = cv2.morphologyEx(frame_threshed, cv2.MORPH_ERODE, kernel)
+#sfunc.cView(opening)
 
-##draw contours 
-#image, contours, hierarchy = cv2.findContours(closing,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
+# count number of clusters
+image, contours, hierarchy = cv2.findContours(frame_threshed,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
+
+#draw clusters on a copy of the original image 
+cropcopy=img_crop.copy()
+
+for cnt in contours:
+    cv2.drawContours(cropcopy, contours, -1, (0,0,255),5)
+sfunc.cView(cropcopy)
+
+print(len(contours))
