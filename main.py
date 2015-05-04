@@ -12,9 +12,6 @@ if __name__ == "__main__":
                 p.quadrat()
                 count=p.count()
                 print("count is : %d" %count)
-        except ValueError, e:
-                if e.message!= 'Failed to load OpenCL runtime':
-                        raise ValueError, e
 
 
 
