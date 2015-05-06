@@ -10,7 +10,7 @@ import numpy as np
 import sfunc
 
 #Read in file
-file="C:/Users/Ben/Desktop/4.tif"
+file="C:/Users/Ben/Desktop/DJI01343.tif"
 img=cv2.imread(file)
 
 #view 
@@ -54,7 +54,7 @@ mask=cv2.drawContours(mask, contours[themax], -1, 255, 1)
 sfunc.cView(mask)
 
 # Perform morphology
-se = np.ones((200,200), dtype='uint8')
+se = np.ones((100,100), dtype='uint8')
 image_close = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, se)
 sfunc.cView(image_close)
 

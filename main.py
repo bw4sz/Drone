@@ -7,11 +7,7 @@ import numpy as np
 #==================
 
 if __name__ == "__main__":
-        try:
-                p=Drone.photo("C:/Users/Ben/Desktop/4.tif")
+                p=Drone.photo("C:/Users/Ben/Dropbox/DJI01343.tif")
                 p.quadrat()
                 count=p.count()
                 print("count is : %d" %count)
-
-
-

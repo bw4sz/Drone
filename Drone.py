@@ -34,7 +34,7 @@ class photo:
                 sfunc.cView(frame_threshed)
                 
                 #inflate sections to remove any small blips
-                kernel = np.ones((100,100),np.uint8)
+                kernel = np.ones((40,40),np.uint8)
                 closing = cv2.dilate(frame_threshed, kernel,2)
                 sfunc.cView(closing)
                 
@@ -82,6 +82,8 @@ class photo:
                 #mask original frame by quadrat plot
                 self.img_crop=cv2.bitwise_and(self.img,self.img,mask=mask2)
                 sfunc.cView(self.img_crop)
+                cv2.imwrite("C:/Users/Ben/Desktop/crop.jpeg", self.img_crop)
+                
         def count(self):
                 ###Cluster images
                 #threshold colors
@@ -107,5 +109,5 @@ class photo:
                 for cnt in contours:
                     cv2.drawContours(cropcopy, contours, -1, (0,0,255),5)
                 sfunc.cView(cropcopy)
-                
+                cv2.imwrite("C:/Users/Ben/Desktop/Output.jpeg", cropcopy)
                 return(len(contours))
