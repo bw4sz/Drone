@@ -1,0 +1,220 @@
+Kmeans Classification
+========================================================
+
+```{r,message=FALSE,warning=FALSE}
+library(raster)
+library(maptools)
+library(ggplot2)
+library(plyr)
+library(reshape2)
+library(rgdal)
+```
+
+#Goals
+
+##Read in points
+
+Georeferenced points relating to the classes
+
+```{r}
+pts<-read.csv("C:/Users/thompson/Desktop/Whetstone_groundtruth_landscapefeatures3.csv")
+```
+
+Basic descriptive data on the classes
+
+```{r}
+table(pts$Landscape.class)
+```
+
+Turn into spatial class
+
+```{r}
+pts<-SpatialPointsDataFrame(cbind(pts$UTM1,pts$UTM2),pts)
+```
+
+Set to utm
+
+```{r}
+proj4string(pts)<-"+proj=utm +zone=10 ellps=WGS84"
+```
+
+```{r}
+ptsll<-spTransform(pts,CRS("+proj=longlat +datum=WGS84"))
+```
+
+Draw extent of points
+
+```{r}
+e<-extent(ptsll)
+```
+
+##Read in the spectral raster 
+crop by extent of points
+```{r}
+r<-brick("G:/Serenity/ImageProcessing/AgisoftFull20150425_Run3.tif")
+rcrop<-crop(r,e)
+plot(rcrop)
+```
+
+##read in DEM
+```{r}
+d<-raster("G:/Serenity/ImageProcessing/AgisoftFull20150425_Run3_DEM.tif")
+dcrop<-crop(d,e)
+names(dcrop)<-c("DEM")
+plot(dcrop)
+
+```
+
+#Overlay points
+```{r,fig.height=10,fig.width=10}
+plot(rcrop)
+points(ptsll,col=ptsll$Landscape.class,pch=16,cex=1.5)
+```
+
+##Extract points from the raster
+
+```{r}
+names(rcrop)<-c("Band1","Band2","Band3","Band4")
+vals<-extract(x=rcrop[[1:3]],y=ptsll,sp=T,buffer=5,fun=mean)
+```
+
+### Composite Band
+
+```{r}
+# sr <- sampleRegular(rcrop, min(100000, ncell(rcrop)))
+# pca<-prcomp(sr)
+# x <- predict(rcrop, pca, index=1:3)
+# plot(x)
+```
+Let's learn about the values
+
+```{r}
+mvals<-melt(vals@data,measure.vars=c("Band1","Band2","Band3"))
+ggplot(mvals,aes(x=Landscape.class,y=value,fill=variable)) + geom_point() + theme_bw()
+```
+
+Do we need to resample the dem to fit the resolution of the spectral?
+
+#Classify points?
+
+##Unsuprivised classifcation
+
+The points are not aligning to our expectation of the classes. Let's have the computer decided the best differentation of the top 4 classes and then assign names to each?
+
+##DEM
+
+```{r}
+cl<-kmeans(x=dcrop[],centers=3,iter.max=10,nstart=3)
+kmeansraster<-raster(dcrop)
+kmeansraster[]<-cl$cluster
+plot(kmeansraster)
+points(ptsll,col=ptsll$Landscape.class,pch=16,cex=.8)
+text(ptsll,labels=ptsll$Landscape.class,pch=16,cex=.7)
+```
+
+So that looks like tree, bush, non-bush, and we need to differentiate types of non-bush!
+
+Select all non-bush
+
+```{r}
+plot(kmeansraster==3)
+nobush<-dcrop[kmeansraster==3]
+plot(nobush)
+```
+
+Need to subsample
+
+##SPECTRAL
+```{r}
+ragg<-aggregate(rcrop,50)
+```
+
+```{r}
+cl<-kmeans(x=ragg[],centers=3,iter.max=10,nstart=3)
+kmeansR<-raster(ragg)
+kmeansR[]<-cl$cluster
+plot(kmeansR)
+points(ptsll,col=ptsll$Landscape.class,pch=16,cex=.5)
+```
+
+Set class 4 to 3
+
+```{r}
+kmeansR[kmeansR==4]<-3
+plot(kmeansR,topo.colors(3))
+```
+
+
+##Combine spectral and DEM
+
+Make DEM into the same dimension as the aggregated
+
+```{r}
+fact<-res(ragg)/res(dcrop)
+#round to 3 decimnal places, we will need to enforce the same size
+dagg<-aggregate(dcrop,fact=fact)
+plot(dagg)
+```
+
+Try to kmeans again, as a stack with the dem
+```{r}
+s<-stack(ragg[[1:3]],dagg)
+cl<-kmeans(x=s[],centers=3,iter.max=10,nstart=3)
+kmeansStack<-raster(s)
+kmeansStack[]<-cl$cluster
+plot(kmeansStack,col=topo.colors(10))
+points(ptsll,col=ptsll$Landscape.class,pch=16,cex=.8)
+text(ptsll,labels=ptsll$Landscape.class,pch=16,cex=.7)
+```
+
+
+
+##Two Stage process
+
+Use the dem to classify the trees and the bushes, but then use the spectral to classify the swale and hummock. To do this we need everything to have the same spatial resolution
+
+* Classify into 3 the dem aggregate raster
+
+Make DEM into the same dimension as the aggregated
+
+```{r}
+#3 classes
+cl<-kmeans(x=dagg[],centers=3,iter.max=10,nstart=3)
+kmeansDagg<-raster(dagg)
+kmeansDagg[]<-cl$cluster
+plot(kmeansDagg,col=topo.colors(10))
+points(ptsll,col=ptsll$Landscape.class,pch=16,cex=.8)
+text(ptsll,labels=ptsll$Landscape.class,pch=16,cex=.7)
+```
+
+Get the portions of the aggregated spectral raster, where the classified aggregated dem raster is not bushes or trees.
+
+```{r}
+kmeansDagg[!kmeansDagg==1]<-NA
+spectralnobush<-mask(ragg,kmeansDagg)
+plot(spectralnobush)
+```
+
+Classify the resulting raster, between types.
+
+```{r}
+spectralnobush[is.na(spectralnobush)]<-0
+cl<-kmeans(x=spectralnobush[],centers=3,iter.max=10,nstart=3)
+kmeansspectralnobush<-raster(spectralnobush)
+kmeansspectralnobush[]<-cl$cluster
+plot(kmeansspectralnobush,col=topo.colors(10))
+```
+
+Combine the spectral class with the dem classification
+
+```{r}
+combo<-kmeansspectralnobush* kmeansDagg
+unique(combo)
+```
+
+1 is Bush
+2 is Tree
+6 is Hummock
+9 is Swale
+
+The remaining question is whether the delinaiation of swale is accurate and fits out expectation surrounding the bushes. If look at the rim of the bushes, you see a kind of swale halo that matches the classification of the river of swale. we need to be sure that fits monica's expectation for the genetic sampling so we have the same terminology!
