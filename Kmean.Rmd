@@ -1,5 +1,9 @@
-Kmeans Classification
-========================================================
+---
+title: "Habitat Classification using Unmanned Aerial Vehicles"
+author: "Ben Weinstein"
+date: "July 2, 2015"
+output: html_document
+---
 
 ```{r,message=FALSE,warning=FALSE}
 library(raster)
@@ -8,64 +12,77 @@ library(ggplot2)
 library(plyr)
 library(reshape2)
 library(rgdal)
+library(plotKML)
+
+#set dropbox path
+droppath<-"C:/Users/Ben/Dropbox/"
 ```
+
+#Preprocessing
+* The data was collected using a Phantom Vision 2+ drone that was shot in manual flight. The photos were shot in RAW and batch transformed to .tif in Photoshop.
+
+* An orthomosiac was created in Agisoft which produced a .tif of three bands, and a DEM. The origin of the DEM remains a mystery to me.
 
 #Goals
 
-##Read in points
+* To read in the points
+* Classify the habitat using kmeans unsupervised classifcation
+* Use the ground truth data to check classification accuracy.
 
-Georeferenced points relating to the classes
+##Read in GPS points
 
 ```{r}
-pts<-read.csv("C:/Users/thompson/Desktop/Whetstone_groundtruth_landscapefeatures3.csv")
+#Georeferenced points relating to the classes
+pt<-readGPX(paste(droppath,"Droning/PamGPSExtract20150701_2.gpx",sep="/"))
+head(pt$waypoints)
 ```
 
-Basic descriptive data on the classes
+The key here is the lon, lat, ele and name, which will match the waypoint ID
+
+## Read in point classification
+
+Pam was in the field and recorded the habitat class of each point
+
+```{r}
+cl<-read.csv(paste(droppath,"Droning/Whetstone_groundtruth_landscapefeatures3.csv",sep="/"))
+
+#merge with the gpx data
+pts<-merge(x=pt$waypoints,y=cl,by.x="name",by.y="Waypoint")
+```
+
+How many points in each class?
 
 ```{r}
 table(pts$Landscape.class)
-```
-
-Turn into spatial class
-
-```{r}
-pts<-SpatialPointsDataFrame(cbind(pts$UTM1,pts$UTM2),pts)
-```
-
-Set to utm
-
-```{r}
-proj4string(pts)<-"+proj=utm +zone=10 ellps=WGS84"
-```
-
-```{r}
-ptsll<-spTransform(pts,CRS("+proj=longlat +datum=WGS84"))
+#Turn into spatial class
+pts<-SpatialPointsDataFrame(cbind(pts$lon,pts$lat),pts)
 ```
 
 Draw extent of points
 
 ```{r}
-e<-extent(ptsll)
+e<-extent(pts)
 ```
 
 ##Read in the spectral raster 
 crop by extent of points
 ```{r}
-r<-brick("G:/Serenity/ImageProcessing/AgisoftFull20150425_Run3.tif")
+r<-brick(paste(droppath,"Droning/AgisoftFull20150425_Run3.tif",sep="/"))
 rcrop<-crop(r,e)
 plot(rcrop)
 ```
 
 ##read in DEM
 ```{r}
-d<-raster("G:/Serenity/ImageProcessing/AgisoftFull20150425_Run3_DEM.tif")
+d<-raster(paste(droppath,"Droning/AgisoftFull20150425_Run3_DEM.tif",sep="/"))
 dcrop<-crop(d,e)
 names(dcrop)<-c("DEM")
 plot(dcrop)
-
 ```
 
-#Overlay points
+###Overlay points 
+As you can see, the points don't quite match yet. Brendan and Pam are checking on the georeferencing of the drone layer. We can continue with the habitat classifcation and wait to test the accuracy of the results.
+
 ```{r,fig.height=10,fig.width=10}
 plot(rcrop)
 points(ptsll,col=ptsll$Landscape.class,pch=16,cex=1.5)
