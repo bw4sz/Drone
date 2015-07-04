@@ -2,7 +2,9 @@
 title: "Habitat Classification using Unmanned Aerial Vehicles"
 author: "Ben Weinstein"
 date: "July 2, 2015"
-output: html_document
+output:
+  html_document:
+    keep_md: yes
 ---
 
 ```{r,message=FALSE,warning=FALSE}
@@ -68,14 +70,16 @@ e<-extent(pts)
 crop by extent of points
 ```{r}
 r<-brick(paste(droppath,"Droning/AgisoftFull20150425_Run3.tif",sep="/"))
-rcrop<-crop(r,e)
+rcrop<-crop(r,e*1.1)
 plot(rcrop)
 ```
 
 ##read in DEM
+
 ```{r}
+#clip by the spatial extent of the points.
 d<-raster(paste(droppath,"Droning/AgisoftFull20150425_Run3_DEM.tif",sep="/"))
-dcrop<-crop(d,e)
+dcrop<-crop(d,e*1.1)
 names(dcrop)<-c("DEM")
 plot(dcrop)
 ```
@@ -85,24 +89,16 @@ As you can see, the points don't quite match yet. Brendan and Pam are checking o
 
 ```{r,fig.height=10,fig.width=10}
 plot(rcrop)
-points(ptsll,col=ptsll$Landscape.class,pch=16,cex=1.5)
+points(pts,col=pts$Landscape.class,pch=16,cex=1.5)
 ```
 
 ##Extract points from the raster
 
 ```{r}
 names(rcrop)<-c("Band1","Band2","Band3","Band4")
-vals<-extract(x=rcrop[[1:3]],y=ptsll,sp=T,buffer=5,fun=mean)
+vals<-extract(x=rcrop[[1:3]],y=pts,sp=T,buffer=5,fun=mean)
 ```
 
-### Composite Band
-
-```{r}
-# sr <- sampleRegular(rcrop, min(100000, ncell(rcrop)))
-# pca<-prcomp(sr)
-# x <- predict(rcrop, pca, index=1:3)
-# plot(x)
-```
 Let's learn about the values
 
 ```{r}
@@ -112,59 +108,22 @@ ggplot(mvals,aes(x=Landscape.class,y=value,fill=variable)) + geom_point() + them
 
 Do we need to resample the dem to fit the resolution of the spectral?
 
-#Classify points?
-
-##Unsuprivised classifcation
+##Unsupervised classifcation
 
 The points are not aligning to our expectation of the classes. Let's have the computer decided the best differentation of the top 4 classes and then assign names to each?
 
-##DEM
+Unsupervised classication is done through kmeans clustering, where we supply the known number of clusters. K-means clustering aims to partition n observations into k clusters in which each observation belongs to the cluster with the nearest mean, serving as a prototype of the cluster. The process is done iteratively, starting with random centers and comparing the fit of each solution.
 
-```{r}
-cl<-kmeans(x=dcrop[],centers=3,iter.max=10,nstart=3)
-kmeansraster<-raster(dcrop)
-kmeansraster[]<-cl$cluster
-plot(kmeansraster)
-points(ptsll,col=ptsll$Landscape.class,pch=16,cex=.8)
-text(ptsll,labels=ptsll$Landscape.class,pch=16,cex=.7)
-```
-
-So that looks like tree, bush, non-bush, and we need to differentiate types of non-bush!
-
-Select all non-bush
-
-```{r}
-plot(kmeansraster==3)
-nobush<-dcrop[kmeansraster==3]
-plot(nobush)
-```
-
-Need to subsample
+Give the relative hetergenity of the system, we can aggregate cells and make this slightly less computationally exhausting. 
 
 ##SPECTRAL
 ```{r}
 ragg<-aggregate(rcrop,50)
 ```
 
-```{r}
-cl<-kmeans(x=ragg[],centers=3,iter.max=10,nstart=3)
-kmeansR<-raster(ragg)
-kmeansR[]<-cl$cluster
-plot(kmeansR)
-points(ptsll,col=ptsll$Landscape.class,pch=16,cex=.5)
-```
+##DEM
 
-Set class 4 to 3
-
-```{r}
-kmeansR[kmeansR==4]<-3
-plot(kmeansR,topo.colors(3))
-```
-
-
-##Combine spectral and DEM
-
-Make DEM into the same dimension as the aggregated
+Make DEM into the same dimension as the aggregated spectral.
 
 ```{r}
 fact<-res(ragg)/res(dcrop)
@@ -172,19 +131,6 @@ fact<-res(ragg)/res(dcrop)
 dagg<-aggregate(dcrop,fact=fact)
 plot(dagg)
 ```
-
-Try to kmeans again, as a stack with the dem
-```{r}
-s<-stack(ragg[[1:3]],dagg)
-cl<-kmeans(x=s[],centers=3,iter.max=10,nstart=3)
-kmeansStack<-raster(s)
-kmeansStack[]<-cl$cluster
-plot(kmeansStack,col=topo.colors(10))
-points(ptsll,col=ptsll$Landscape.class,pch=16,cex=.8)
-text(ptsll,labels=ptsll$Landscape.class,pch=16,cex=.7)
-```
-
-
 
 ##Two Stage process
 
@@ -200,8 +146,8 @@ cl<-kmeans(x=dagg[],centers=3,iter.max=10,nstart=3)
 kmeansDagg<-raster(dagg)
 kmeansDagg[]<-cl$cluster
 plot(kmeansDagg,col=topo.colors(10))
-points(ptsll,col=ptsll$Landscape.class,pch=16,cex=.8)
-text(ptsll,labels=ptsll$Landscape.class,pch=16,cex=.7)
+points(pts,col=pts$Landscape.class,pch=16,cex=.8)
+text(pts,labels=pts$Landscape.class,pch=16,cex=.7)
 ```
 
 Get the portions of the aggregated spectral raster, where the classified aggregated dem raster is not bushes or trees.
@@ -235,3 +181,7 @@ unique(combo)
 9 is Swale
 
 The remaining question is whether the delinaiation of swale is accurate and fits out expectation surrounding the bushes. If look at the rim of the bushes, you see a kind of swale halo that matches the classification of the river of swale. we need to be sure that fits monica's expectation for the genetic sampling so we have the same terminology!
+
+#Computing geographic distances
+#Computing resistance distance
+#Computing least cost path
