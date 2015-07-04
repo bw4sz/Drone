@@ -69,8 +69,18 @@ e<-extent(pts)
 ##Read in the spectral raster 
 crop by extent of points
 ```{r}
-r<-brick(paste(droppath,"Droning/AgisoftFull20150425_Run3.tif",sep="/"))
-rcrop<-crop(r,e*1.1)
+r1<-raster("C:/Users/Ben/Dropbox/Droning/spectral.tif",band=1,values=T)
+```
+
+Crop raster to points
+```{r}
+plot(extent(r1))
+plot(extent(e),col='red',add=T)
+rcrop<-crop(x=r1,y=e*1.1)
+
+#save raster to file if we need to start from there
+
+#rcrop<-brick(paste(droppath,"Droning/SpectralCrop.gri",sep="/"))
 plot(rcrop)
 ```
 
