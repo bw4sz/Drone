@@ -114,17 +114,7 @@ r</code></pre>
 rg&lt;-readGDAL(fil,band=1)</code></pre>
 <pre><code>## C:/Users/Ben/Dropbox//Droning/AgisoftFull20150425_Run3.tif has GDAL driver GTiff 
 ## and has 39891 rows and 35132 columns</code></pre>
-<pre><code>## Warning in array(dim = as.integer(c(rev(output.dim), length(band)))):
-## Reached total allocation of 4006Mb: see help(memory.size)</code></pre>
-<pre><code>## Warning in array(dim = as.integer(c(rev(output.dim), length(band)))):
-## Reached total allocation of 4006Mb: see help(memory.size)</code></pre>
-<pre><code>## Warning in array(dim = as.integer(c(rev(output.dim), length(band)))):
-## Reached total allocation of 4006Mb: see help(memory.size)</code></pre>
-<pre><code>## Warning: closing unused connection 5 (C:/Users/Ben/AppData/Local/Temp/
-## R_raster_Ben/2015-07-04_180357_2288_74302.gri)</code></pre>
-<pre><code>## Warning in array(dim = as.integer(c(rev(output.dim), length(band)))):
-## Reached total allocation of 4006Mb: see help(memory.size)</code></pre>
-<pre><code>## Error: cannot allocate vector of size 5.2 Gb</code></pre>
+<pre><code>## Error: Failure during raster IO</code></pre>
 <pre class="r"><code>rg&lt;-readGDAL(fil,band=1,output.dim = c(1000,1000))</code></pre>
 <pre><code>## C:/Users/Ben/Dropbox//Droning/AgisoftFull20150425_Run3.tif has GDAL driver GTiff 
 ## and has 39891 rows and 35132 columns</code></pre>
@@ -168,13 +158,13 @@ plot(d2)</code></pre>
 ## [1] stats     graphics  grDevices utils     datasets  methods   base     
 ## 
 ## other attached packages:
-## [1] rgdal_1.0-4   raster_2.3-40 sp_1.1-1      knitr_1.10.5 
+## [1] rgdal_1.0-4   raster_2.4-15 sp_1.1-1      knitr_1.10.5 
 ## 
 ## loaded via a namespace (and not attached):
-##  [1] magrittr_1.5      formatR_1.2       tools_3.2.1      
-##  [4] htmltools_0.2.6   yaml_2.1.13       stringi_0.5-5    
-##  [7] rmarkdown_0.5.3.2 grid_3.2.1        stringr_1.0.0    
-## [10] digest_0.6.8      lattice_0.20-31   evaluate_0.7</code></pre>
+##  [1] magrittr_1.5    formatR_1.2     tools_3.2.1     htmltools_0.2.6
+##  [5] yaml_2.1.13     Rcpp_0.11.6     stringi_0.5-5   rmarkdown_0.7  
+##  [9] grid_3.2.1      stringr_1.0.0   digest_0.6.8    lattice_0.20-31
+## [13] evaluate_0.7</code></pre>
 
 
 </div>
