@@ -69,7 +69,13 @@ e<-extent(pts)
 ##Read in the spectral raster 
 crop by extent of points
 ```{r}
-r<-brick(paste(droppath,"Droning/AgisoftFull20150425_Run3.tif",sep="/"))
+fil<-paste(droppath,"Droning/AgisoftFull20150425_Run3.tif",sep="/")
+r<-brick(fil)
+res(r)<-res(r) * 1000
+plot(r)
+rg<-readGDAL(fil,band=1,output.dim = c(1000,1000))
+
+plot(r[[1]])
 rcrop<-crop(r,e*1.1)
 plot(rcrop)
 ```

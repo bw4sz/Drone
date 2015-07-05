@@ -1,0 +1,69 @@
+---
+title: "Error reading large tif"
+author: "Ben Weinstein"
+date: "July 4, 2015"
+output: html_document
+---
+
+Hi all,
+
+I recieved a orthomosiac image from a colloborator that i'm reading into R. The file was captured using a unmanned aerial vehicle and stiched in Agisoft Photoscan, and the resulting .tif was sent to me.
+
+The file is quite large (~4gb on disk) and at very high resolution. 
+
+When i read in using raster, everything seems fine. The extent matches the correct location on the earth's surface.
+
+```{r,echo=F,message=FALSE,warning=FALSE}
+library(knitr)
+opts_chunk$set(error=TRUE,cache=FALSE)
+```
+
+```{r}
+library(raster)
+library(rgdal)
+droppath<-"C:/Users/Ben/Dropbox/"
+
+
+fil<-paste(droppath,"Droning/AgisoftFull20150425_Run3.tif",sep="/")
+
+r<-raster(fil)
+r
+extent(r)
+```
+
+However if i try to perform any operation on the image, i recieve an error.
+
+```{r,error=TRUE}
+r2<-crop(r,extent(r)/2)
+```
+
+I've tried over mulitple computers, reading as brick/stack/raster, reinstalling rgdal/raster, reinstalling R and playing around with the file names. 
+
+Given the huge file size, i assume that this is has to do with memory (as been suggested elsewhere with this error) - although checking out the task manager, i see no memory spike and it appears to be a formatting error for gdal. I've tried reading direct with gdal, and that fails, even when reading just a portion.
+
+```{r}
+fil<-paste(droppath,"Droning/AgisoftFull20150425_Run3.tif",sep="/")
+
+rg<-readGDAL(fil,band=1)
+rg<-readGDAL(fil,band=1,output.dim = c(1000,1000))
+plot(rg)
+```
+
+*There was a second file that was made using the same software that is much smaller (~300mb) that reads in fine.* This leads me to believe there is nothing wrong with the way i've installed the packages and that something is corrupted with the first (larger) file.
+
+
+```{r}
+d<-raster(fil<-paste(droppath,"Droning/AgisoftFull20150425_Run3_DEM.tif",sep="/"))
+d
+extent(d)
+d2<-crop(d,extent(d)/2)
+plot(d2)
+```
+
+I appreciate all suggestions on what might be malformed that would prevent gdal from reading the file, but raster package to extract the correct metadata. What's even stranger is that my collaborator claims she was able to open this file in R using the exact same procedure as above. We are both on windows.
+
+I apologize for the lack of reproducibility, i'm looking for opinions on next steps in debugging.
+
+```{r}
+sessionInfo()
+```
