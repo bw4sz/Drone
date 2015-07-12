@@ -87,7 +87,9 @@ rcrop<-crop(x=r1,y=e*1.1)
 
 ```{r}
 #clip by the spatial extent of the points.
-d<-raster(paste(droppath,"Droning/AgisoftFull20150425_Run3_DEM.tif",sep="/"))
+d<-raster(paste(droppath,"Droning/20150425_Run4_DEM_NAD83UTM10N.tif",sep="/"))
+#reproject 
+d1<-projectRaster(from=d,to=r1)
 dcrop<-crop(d,e*1.1)
 names(dcrop)<-c("DEM")
 plot(dcrop)
@@ -97,8 +99,8 @@ plot(dcrop)
 As you can see, the points don't quite match yet. Brendan and Pam are checking on the georeferencing of the drone layer. We can continue with the habitat classifcation and wait to test the accuracy of the results.
 
 ```{r,fig.height=10,fig.width=10}
-#plot(rcrop)
-#points(pts,col=pts$Landscape.class,pch=16,cex=1.5)
+plot(rcrop)
+points(pts,col=pts$Landscape.class,pch=16,cex=1.5)
 ```
 
 ##Extract points from the raster
