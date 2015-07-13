@@ -18,6 +18,7 @@ library(rgdal)
 library(plotKML)
 library(rgeos)
 library(gdistance)
+library(SDMTools)
 
 #set dropbox path
 droppath<-"C:/Users/Ben/Dropbox/"
@@ -88,10 +89,12 @@ rcrop<-crop(x=r1,y=e*1.1)
 ```{r}
 #clip by the spatial extent of the points.
 d<-raster(paste(droppath,"Droning/20150425_Run4_DEM_NAD83UTM10N.tif",sep="/"))
-#reproject 
-d1<-projectRaster(from=d,to=r1)
+#crop
 dcrop<-crop(d,e*1.1)
 names(dcrop)<-c("DEM")
+
+#remove negative elevation?
+dcrop[dcrop<0]<-0
 plot(dcrop)
 ```
 
@@ -106,15 +109,15 @@ points(pts,col=pts$Landscape.class,pch=16,cex=1.5)
 ##Extract points from the raster
 
 ```{r}
-#names(rcrop)<-c("Band1","Band2","Band3","Band4")
-#vals<-extract(x=rcrop[[1:3]],y=pts,sp=T,buffer=5,fun=mean)
+names(rcrop)<-c("Band1","Band2","Band3","Band4")
+vals<-extract(x=rcrop[[1:3]],y=pts,sp=T,buffer=5,fun=mean)
 ```
 
 Let's learn about the values
 
 ```{r}
-#mvals<-melt(vals@data,measure.vars=c("Band1","Band2","Band3"))
-#ggplot(mvals,aes(x=Landscape.class,y=value,fill=variable)) + geom_point() + theme_bw()
+mvals<-melt(vals@data,measure.vars=c("Band1","Band2","Band3"))
+ggplot(mvals,aes(x=Landscape.class,y=value,fill=variable)) + geom_point() + theme_bw()
 ```
 
 Do we need to resample the dem to fit the resolution of the spectral?
@@ -129,7 +132,7 @@ Give the relative hetergenity of the system, we can aggregate cells and make thi
 
 ##SPECTRAL
 ```{r}
-#ragg<-aggregate(rcrop,50)
+ragg<-aggregate(rcrop,50)
 ```
 
 ##DEM
@@ -137,8 +140,8 @@ Give the relative hetergenity of the system, we can aggregate cells and make thi
 Make DEM into the same dimension as the aggregated spectral.
 
 ```{r}
-#fact<-res(ragg)/res(dcrop)
-fact=50
+fact<-res(ragg)/res(dcrop)
+#fact=50
 #round to 3 decimnal places, we will need to enforce the same size
 dagg<-aggregate(dcrop,fact=fact)
 plot(dagg)
@@ -201,7 +204,7 @@ The field of landscape ecology has thought alot about the permiability of matric
 We can measure fragmentation, size, area, shape, etc. For example for each of our classes (bush,swale,hummock,tree = 1,2,3,4)
 
 ```{r,fig.height=20}
-stats<-ClassStat(kmeansDagg,cell)
+stats<-ClassStat(kmeansDagg,res(kmeansDagg)[1])
 stats<-melt(stats,id.vars="class")
 ggplot(stats,aes(x=class,y=value)) + geom_bar(stat="identity") + facet_wrap(~variable,scales="free",ncol=4)
 ```
@@ -248,5 +251,5 @@ Okay, enough with the diatribe, here's how you do it using the package gdistance
 ## Create a resistance surfarce
 
 ```{r}
-transition(kmeansDagg)
+tr<-transition(kmeansDagg,mean)
 #Computing least cost path
