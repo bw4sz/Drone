@@ -19,6 +19,7 @@ library(plotKML)
 library(rgeos)
 library(gdistance)
 library(SDMTools)
+library(rasterVis)
 
 #set dropbox path
 droppath<-"C:/Users/Ben/Dropbox/"
@@ -26,6 +27,10 @@ droppath<-"C:/Users/Ben/Dropbox/"
 
 #Preprocessing
 * The data was collected using a Phantom Vision 2+ drone that was shot in manual flight. The photos were shot in RAW and batch transformed to .tif in Photoshop.
+
+If we are thinking about a paper, figure 1 might be a cartoon depiction of each individual step in the process going from right to left, above the step is the goal of the step, and below is the software used with some parameter settings.
+
+To this end, we really need to settle on a fully automated way to do all of this, it can't be unclear what we did/why we did it/how we'd redo it. If the goal of the paper is to demystify some of the drone work, it needs to abundantly clear how we made it to each step. Right now i'm using a dem from one run, and a spectral reading from another, in different projections, with coordinates shot in different projections. 
 
 * An orthomosiac was created in Agisoft which produced a .tif of three bands, and a DEM. The origin of the DEM remains a mystery to me.
 
@@ -81,16 +86,20 @@ Crop raster to points
 ```{r}
 plot(extent(r1))
 plot(extent(e),col='red',add=T)
-rcrop<-crop(x=r1,y=e*1.1)
+rcrop<-crop(x=r1,y=e*1.01)
 ```
 
 ##read in DEM
 
 ```{r}
 #clip by the spatial extent of the points.
-d<-raster(paste(droppath,"Droning/20150425_Run4_DEM_NAD83UTM10N.tif",sep="/"))
+d<-raster(paste(droppath,"Droning/AgisoftFull20150425_Run3_DEM.tif",sep="/"))
+
+#reproject
+dpr<-projectRaster(d,rcrop)
+
 #crop
-dcrop<-crop(d,e*1.1)
+dcrop<-crop(dpr,extent(rcrop))
 names(dcrop)<-c("DEM")
 
 #remove negative elevation?
@@ -110,14 +119,14 @@ points(pts,col=pts$Landscape.class,pch=16,cex=1.5)
 
 ```{r}
 names(rcrop)<-c("Band1","Band2","Band3","Band4")
-vals<-extract(x=rcrop[[1:3]],y=pts,sp=T,buffer=5,fun=mean)
+vals<-extract(x=rcrop[[1:3]],y=pts,sp=T,buffer=2,fun=mean)
 ```
 
 Let's learn about the values
 
 ```{r}
 mvals<-melt(vals@data,measure.vars=c("Band1","Band2","Band3"))
-ggplot(mvals,aes(x=Landscape.class,y=value,fill=variable)) + geom_point() + theme_bw()
+ggplot(mvals,aes(x=Landscape.class,y=value,col=variable)) + geom_boxplot() + theme_bw()
 ```
 
 Do we need to resample the dem to fit the resolution of the spectral?
@@ -132,7 +141,7 @@ Give the relative hetergenity of the system, we can aggregate cells and make thi
 
 ##SPECTRAL
 ```{r}
-ragg<-aggregate(rcrop,50)
+ragg<-aggregate(rcrop,30)
 ```
 
 ##DEM
@@ -145,50 +154,65 @@ fact<-res(ragg)/res(dcrop)
 #round to 3 decimnal places, we will need to enforce the same size
 dagg<-aggregate(dcrop,fact=fact)
 plot(dagg)
+
+#there can be rounding errors, enforce the same extent
+extent(dagg)<-extent(ragg)
 ```
 
-##Two Stage process
+#Create habitat classification
+##Two Stage process - DEM then Spectral
 
 Use the dem to classify the trees and the bushes, but then use the spectral to classify the swale and hummock. To do this we need everything to have the same spatial resolution
 
 * Classify into 3 the dem aggregate raster
 
-Make DEM into the same dimension as the aggregated
-
 ```{r}
 #3 classes
 dagg[is.na(dagg[])]<-0
-cl<-kmeans(x=dagg[],centers=3,iter.max=10,nstart=3)
+cl<-kmeans(x=dagg[],centers=3,iter.max=100,nstart=3)
 kmeansDagg<-raster(dagg)
 kmeansDagg[]<-cl$cluster
 plot(kmeansDagg,col=topo.colors(10))
-points(pts,col=pts$Landscape.class,pch=16,cex=.8)
-text(pts,labels=pts$Landscape.class,pch=16,cex=.7)
+points(rpts,col=rpts$Landscape.class,pch=16,cex=.8)
+text(rpts,labels=rpts$Landscape.class,pch=16,cex=.7)
 ```
 
 Get the portions of the aggregated spectral raster, where the classified aggregated dem raster is not bushes or trees.
 
 ```{r}
-#kmeansDagg[!kmeansDagg==1]<-NA
-#spectralnobush<-mask(ragg,kmeansDagg)
-#plot(spectralnobush)
+#hard code a value in there, ordinal scale changes.
+v=extract(kmeansDagg,cbind(x=507579.1,y=4696391))
+#make a copy
+kmeancopy<-kmeansDagg
+kmeancopy[!kmeancopy==v]<-NA
+spectralnobush<-mask(ragg,kmeancopy)
+plot(spectralnobush)
 ```
 
 Classify the resulting raster, between types.
 
 ```{r}
-#spectralnobush[is.na(spectralnobush)]<-0
-#cl<-kmeans(x=spectralnobush[],centers=3,iter.max=10,nstart=3)
-#kmeansspectralnobush<-raster(spectralnobush)
-#kmeansspectralnobush[]<-cl$cluster
-#plot(kmeansspectralnobush,col=topo.colors(10))
+spectralnobush[is.na(spectralnobush)]<-0
+cl<-kmeans(x=spectralnobush[[1:3]][],centers=3,iter.max=100,nstart=3)
+kmeansspectralnobush<-raster(spectralnobush)
+kmeansspectralnobush[]<-cl$cluster
+plot(kmeansspectralnobush,col=topo.colors(10))
 ```
 
 Combine the spectral class with the dem classification
 
 ```{r}
-#combo<-kmeansspectralnobush* kmeansDagg
-#unique(combo)
+combo<-kmeansspectralnobush* kmeansDagg
+unique(combo)
+plot(combo)
+levelplot(combo,margin=F)
+plotRGB(ragg)
+```
+
+##Overlay on image
+```{r}
+plotRGB(ragg)
+plot(combo,alpha=.5,add=T)
 ```
 
 1 is Bush
@@ -214,7 +238,7 @@ ggplot(stats,aes(x=class,y=value)) + geom_bar(stat="identity") + facet_wrap(~var
 Create a matric of euclidean distance
 
 ```{r}
-geo<-pointDistance(pts,pts,lonlat=T,allpairs = T)
+geo<-pointDistance(rpts,rpts,lonlat=T,allpairs = T)
 ```
 
 So for example if you wanted the geographic distance between the 2nd and 32nd point. Calculated in meters.
@@ -222,8 +246,8 @@ So for example if you wanted the geographic distance between the 2nd and 32nd po
 ```{r}
 geo[2,32]
 plot(kmeansDagg)
-points(pts[c(2,32),],col='black',pch=16,cex=2)
-lines(coordinates(pts[c(2,32),]),lwd=3)
+points(rpts[c(2,32),],col='black',pch=16,cex=2)
+lines(coordinates(rpts[c(2,32),]),lwd=3)
 ```
 
 Average distance between points
@@ -246,10 +270,13 @@ Much, much more important than the algorithmic approach is the biological basis 
 **Questions to ponder**
 Do we want all habitats to present the same barrier? Is it a linear function of habitat? Or does the edge of the habitat present a barrier that is slightly permeable, but the center of a patch is basically impermeable. Does path size matter? There are alot of variations here, and i must admit that i have always been unsure of the validity of comparing costs. More, what i've done in the past if to think of them as unitless surfaces and just order them as a 'more costly path' versus a 'less costly path'. 
 
-Okay, enough with the diatribe, here's how you do it using the package gdistance
+Okay, enough with the diatribe, here's how you do it using the package gdistance:
 
 ## Create a resistance surfarce
 
 ```{r}
-tr<-transition(kmeansDagg,mean)
+tr<-transition(kmeansDagg,mean,directions = 8)
 #Computing least cost path
+```
+
+##Calculate least cost path between points.
