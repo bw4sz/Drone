@@ -18,6 +18,8 @@ library(rasterVis)
 
 #set dropbox path
 droppath<-"C:/Users/Ben/Dropbox/"
+
+load("Drone.RData")
 ```
 
 #Preprocessing
@@ -98,13 +100,14 @@ projection(pts)<-CRS("+proj=longlat +datum=WGS84")
 crop by extent of points
 
 ```r
-r1<-brick("C:/Users/Ben/Dropbox/Droning/20150425_Run4_NAD83UTM10N.tif")
+r1<-brick("C:/Users/Ben/Dropbox/Droning/20150425_Run6.tif")
 ```
 
 reproject points to UTM
 
 ```r
-rpts<-spTransform(pts,CRS(projection(r1)))
+#rpts<-spTransform(pts,CRS(projection(r1)))
+rpts<-pts
 e<-extent(rpts)
 ```
 
@@ -126,21 +129,27 @@ rcrop<-crop(x=r1,y=e*1.01)
 
 ```r
 #clip by the spatial extent of the points.
-d<-raster(paste(droppath,"Droning/AgisoftFull20150425_Run3_DEM.tif",sep="/"))
+d<-raster(paste(droppath,"Droning/20150425_Run6_DEM.tif",sep="/"))
 
-#reproject
-dpr<-projectRaster(d,rcrop)
+#reproject?
+#dpr<-projectRaster(d,rcrop)
 
 #crop
-dcrop<-crop(dpr,extent(rcrop))
+dcrop<-crop(d,extent(rcrop))
 names(dcrop)<-c("DEM")
 
 #remove negative elevation?
 dcrop[dcrop<0]<-0
+```
+
+View DEM
+
+
+```r
 plot(dcrop)
 ```
 
-![](Kmean_files/figure-html/unnamed-chunk-8-1.png) 
+![](Kmean_files/figure-html/unnamed-chunk-9-1.png) 
 
 ###Overlay points 
 As you can see, the points don't quite match yet. Brendan and Pam are checking on the georeferencing of the drone layer. We can continue with the habitat classifcation and wait to test the accuracy of the results.
@@ -151,7 +160,7 @@ plot(rcrop)
 points(pts,col=pts$Landscape.class,pch=16,cex=1.5)
 ```
 
-![](Kmean_files/figure-html/unnamed-chunk-9-1.png) 
+![](Kmean_files/figure-html/unnamed-chunk-10-1.png) 
 
 ##Extract points from the raster
 
@@ -169,7 +178,7 @@ mvals<-melt(vals@data,measure.vars=c("Band1","Band2","Band3"))
 ggplot(mvals,aes(x=Landscape.class,y=value,col=variable)) + geom_boxplot() + theme_bw()
 ```
 
-![](Kmean_files/figure-html/unnamed-chunk-11-1.png) 
+![](Kmean_files/figure-html/unnamed-chunk-12-1.png) 
 
 Do we need to resample the dem to fit the resolution of the spectral?
 
@@ -184,7 +193,7 @@ Give the relative hetergenity of the system, we can aggregate cells and make thi
 ##SPECTRAL
 
 ```r
-ragg<-aggregate(rcrop,30)
+ragg<-aggregate(rcrop,20)
 ```
 
 ##DEM
@@ -200,7 +209,7 @@ dagg<-aggregate(dcrop,fact=fact)
 plot(dagg)
 ```
 
-![](Kmean_files/figure-html/unnamed-chunk-13-1.png) 
+![](Kmean_files/figure-html/unnamed-chunk-14-1.png) 
 
 ```r
 #there can be rounding errors, enforce the same extent
@@ -211,13 +220,13 @@ extent(dagg)<-extent(ragg)
 ##Two Stage process - DEM then Spectral
 
 Use the dem to classify the trees and the bushes, but then use the spectral to classify the swale and hummock. To do this we need everything to have the same spatial resolution
-
 * Classify into 3 the dem aggregate raster
 
 
 ```r
 #3 classes
-dagg[is.na(dagg[])]<-0
+#dagg[is.na(dagg[])]<-0
+
 cl<-kmeans(x=dagg[],centers=3,iter.max=100,nstart=3)
 kmeansDagg<-raster(dagg)
 kmeansDagg[]<-cl$cluster
@@ -226,22 +235,29 @@ points(rpts,col=rpts$Landscape.class,pch=16,cex=.8)
 text(rpts,labels=rpts$Landscape.class,pch=16,cex=.7)
 ```
 
-![](Kmean_files/figure-html/unnamed-chunk-14-1.png) 
+![](Kmean_files/figure-html/unnamed-chunk-15-1.png) 
 
 Get the portions of the aggregated spectral raster, where the classified aggregated dem raster is not bushes or trees.
 
 
 ```r
 #hard code a value in there, ordinal scale changes.
-v=extract(kmeansDagg,cbind(x=507579.1,y=4696391))
+swale<-extract(kmeansDagg,cbind(-122.9093,42.42011))
+
 #make a copy
 kmeancopy<-kmeansDagg
-kmeancopy[!kmeancopy==v]<-NA
+plot(tomask<-Which(!kmeancopy==swale))
+```
+
+![](Kmean_files/figure-html/unnamed-chunk-16-1.png) 
+
+```r
+kmeancopy[tomask]<-NA
 spectralnobush<-mask(ragg,kmeancopy)
 plot(spectralnobush)
 ```
 
-![](Kmean_files/figure-html/unnamed-chunk-15-1.png) 
+![](Kmean_files/figure-html/unnamed-chunk-16-2.png) 
 
 Classify the resulting raster, between types.
 
@@ -254,7 +270,7 @@ kmeansspectralnobush[]<-cl$cluster
 plot(kmeansspectralnobush,col=topo.colors(10))
 ```
 
-![](Kmean_files/figure-html/unnamed-chunk-16-1.png) 
+![](Kmean_files/figure-html/unnamed-chunk-17-1.png) 
 
 Combine the spectral class with the dem classification
 
@@ -265,42 +281,83 @@ unique(combo)
 ```
 
 ```
-## [1] 1 2 3 4 6
+## [1] 1 2 3 6 9
 ```
 
 ```r
 plot(combo)
 ```
 
-![](Kmean_files/figure-html/unnamed-chunk-17-1.png) 
+![](Kmean_files/figure-html/unnamed-chunk-18-1.png) 
 
 ```r
-levelplot(combo,margin=F)
+levelplot(combo,margin=F,par.settings=RdBuTheme())
 ```
 
-![](Kmean_files/figure-html/unnamed-chunk-17-2.png) 
+![](Kmean_files/figure-html/unnamed-chunk-18-2.png) 
 
-```r
-plotRGB(ragg)
-```
-
-![](Kmean_files/figure-html/unnamed-chunk-17-3.png) 
+It looks like due to the lack of interpolation in the first image, there is some scattering that creates a fifth class. This needs to be addressed.
 
 ##Overlay on image
 
+
 ```r
 plotRGB(ragg)
-plot(combo,alpha=.5,add=T)
+plot(combo,alpha=.3,add=T,axes=F)
 ```
 
-![](Kmean_files/figure-html/unnamed-chunk-18-1.png) 
+![](Kmean_files/figure-html/unnamed-chunk-19-1.png) 
 
-1 is Bush
-2 is Tree
-6 is Hummock
-9 is Swale
+The ordinal position of each class (1,2,3,4...) is random each run, since its control by the center of the k means clustering. This means that we need to hard code classes to make sense of this moving forward. Eventually we need to use actual ground truth points.
 
-The remaining question is whether the delinaiation of swale is accurate and fits out expectation surrounding the bushes. If look at the rim of the bushes, you see a kind of swale halo that matches the classification of the river of swale. we need to be sure that fits monica's expectation for the genetic sampling so we have the same terminology!
+
+```r
+#extract value from fixed locations
+tree<-extract(combo,cbind(-122.9083,42.41852))
+bush<-extract(combo,cbind(-122.9096,42.42054))
+swale<-extract(combo,cbind(-122.9093,42.4202))
+hummock<-extract(combo,cbind(-122.908,42.4198))
+```
+
+**Tree is :9**
+**Bush is :6**
+**Swale is :2**
+**Hummock is :1**
+
+The remaining question is whether the deliniation of swale is accurate and fits out expectation surrounding the bushes. If look at the rim of the bushes, you see a kind of swale halo that matches the classification of the river of swale. we need to be sure that fits monica's expectation for the genetic sampling so we have the same terminology!
+
+Assign classes
+
+
+```r
+combo <- ratify(combo)
+rat <- levels(combo)[[1]]
+
+#create lookup table
+lookup<-data.frame(value=c(swale,hummock,bush,tree),cl=c('swale','hummock','bush','tree'))
+
+rat<-merge(rat,lookup,by.x="ID",by.y="value",all=T)
+
+#remove NA
+combo[combo==rat[is.na(rat$cl),"ID"]]<-NA
+
+#repeat without NA, probably not the cleanest way to do that
+combo <- ratify(combo)
+rat <- levels(combo)[[1]]
+
+#create lookup table
+lookup<-data.frame(value=c(swale,hummock,bush,tree),cl=c('swale','hummock','bush','tree'))
+
+rat<-merge(rat,lookup,by.x="ID",by.y="value",all=T)
+
+levels(combo) <- rat
+
+levelplot(combo,par.settings=BuRdTheme())
+```
+
+![](Kmean_files/figure-html/unnamed-chunk-21-1.png) 
+
+The na's are due to the lack of interpolation. We can fix that.
 
 ### Landscape ecology metrics
 
@@ -309,12 +366,17 @@ We can measure fragmentation, size, area, shape, etc. For example for each of ou
 
 
 ```r
-stats<-ClassStat(kmeansDagg,res(kmeansDagg)[1])
-stats<-melt(stats,id.vars="class")
-ggplot(stats,aes(x=class,y=value)) + geom_bar(stat="identity") + facet_wrap(~variable,scales="free",ncol=4)
+#
+stats<-ClassStat(combo,res(combo)[1])
+
+#merge with rat table
+stats<-merge(stats,rat,by.x="class",by.y="ID")
+
+stats<-melt(stats,id.vars="cl")
+ggplot(stats,aes(x=cl,y=value)) + geom_bar(stat="identity") + facet_wrap(~variable,scales="free",ncol=4)
 ```
 
-![](Kmean_files/figure-html/unnamed-chunk-19-1.png) 
+![](Kmean_files/figure-html/unnamed-chunk-22-1.png) 
 
 #Computing geographic distances
 
@@ -322,7 +384,7 @@ Create a matric of euclidean distance
 
 
 ```r
-geo<-pointDistance(rpts,rpts,lonlat=T,allpairs = T)
+geo<-pointDistance(rpts,rpts,lonlat=F,allpairs = T)
 ```
 
 So for example if you wanted the geographic distance between the 2nd and 32nd point. Calculated in meters.
@@ -333,29 +395,29 @@ geo[2,32]
 ```
 
 ```
-## [1] 3973944
+## [1] 0.004011303
 ```
 
 ```r
-plot(kmeansDagg)
+plot(combo)
 points(rpts[c(2,32),],col='black',pch=16,cex=2)
 lines(coordinates(rpts[c(2,32),]),lwd=3)
 ```
 
-![](Kmean_files/figure-html/unnamed-chunk-21-1.png) 
+![](Kmean_files/figure-html/unnamed-chunk-24-1.png) 
 
 Average distance between points
 
 
 ```r
-ggplot(melt(geo),aes(x=value)) + geom_histogram() + theme_bw() + labs(x="Distance between points")
+ggplot(melt(geo),aes(x=value)) + geom_histogram() + theme_bw() + labs(x="Geographic Distance between points (m)")
 ```
 
 ```
 ## stat_bin: binwidth defaulted to range/30. Use 'binwidth = x' to adjust this.
 ```
 
-![](Kmean_files/figure-html/unnamed-chunk-22-1.png) 
+![](Kmean_files/figure-html/unnamed-chunk-25-1.png) 
 
 #Computing resistance distance
 
@@ -375,10 +437,66 @@ Okay, enough with the diatribe, here's how you do it using the package gdistance
 
 ## Create a resistance surfarce
 
+**Niave** without accounting for resistance values.
+
+The first thought is to make all habitat classes equally penalized. Seeds prefer to move within the same habitat class. In this case, the same habitat would get a 1, a different habitat would get a 2.
+
 
 ```r
-tr<-transition(kmeansDagg,mean,directions = 8)
-#Computing least cost path
+#origin point
+orig<-rpts[2,]
+
+#same habitat gets a 1, different habitat gets a 2
+same<-(combo == extract(coordinates(orig),x=combo))+1
+
+plot(same)
+points(orig,col="red",cex=2,pch=16)
 ```
 
-##Calculate least cost path between points.
+![](Kmean_files/figure-html/unnamed-chunk-26-1.png) 
+
+```r
+#destination point
+dest<-rpts[32,]
+
+tr<-transition(same,mean,directions = 8)
+  
+#shortest path
+l<-shortestPath(tr,orig,dest,output="SpatialLines")
+
+plot(combo,xaxt="n",yaxt="n",main="Example Least Cost Distance")
+points(orig,col="red",cex=1.5,pch=20)
+points(dest,col="blue",cex=1.5,pch=20)
+lines(l)
+```
+
+![](Kmean_files/figure-html/unnamed-chunk-26-2.png) 
+
+##Calculate cost distance path between all points.
+
+```r
+cd<-costDistance(x=tr,coordinates(rpts),coordinates(rpts))
+```
+
+###Compare to euclidean distance
+
+
+```r
+md<-melt(list(Geographic=geo,CostDistance=cd))
+md<-dcast(md,...~L1)
+ggplot(md,aes(x=Geographic,y=CostDistance)) + geom_point() + geom_smooth(method="lm") + xlab("Geographic Distance (m)")
+```
+
+![](Kmean_files/figure-html/unnamed-chunk-28-1.png) 
+
+#To do
+
+* Create some simulated fst values
+* Upload Monica's sampling data
+* Distribution models for suitability surfaces?
+* think hard about resistance values.
+
+
+```r
+save.image("Drone.RData")
+```
