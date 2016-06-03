@@ -38,4 +38,4 @@ cv2.imshow('src',src)
 cv2.waitKey(0)
 cv2.destroyAllWindows()
 
-cv2.imwrite(dst,"corrected.tiff")
+cv2.imwrite("corrected.tiff",dst)
